@@ -232,7 +232,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       return data.map((m: any) => ({
         id: `msg-${m.id}`,
         type: m.message_type || 'info',
-        content: m.message,
+        content: m.content,
         read: m.is_read,
         createdAt: m.created_at
       })) as Message[];
