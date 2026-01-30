@@ -157,7 +157,7 @@ export default function ChildHome() {
                       <Checkbox id={t.id} onCheckedChange={() => completeTaskMutation.mutate(t.id)} className="w-6 h-6 border-2 border-slate-600 data-[state=checked]:bg-blue-600 data-[state=checked]:border-blue-600" />
                       <div>
                         <label htmlFor={t.id} className="font-medium text-lg leading-none text-slate-200 peer-disabled:cursor-not-allowed peer-disabled:opacity-70">{t.title}</label>
-                        <p className="text-xs text-slate-500 mt-1">Prazo: {new Date(t.deadline).toLocaleDateString()}</p>
+                        <p className="text-xs text-slate-500 mt-1">Valor: R${t.value?.toFixed(2)}</p>
                       </div>
                     </div>
                   ))}

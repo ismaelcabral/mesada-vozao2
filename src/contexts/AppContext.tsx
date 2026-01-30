@@ -12,7 +12,7 @@ export interface Transaction {
   season_id?: number;
 }
 
-export interface Task { id: string; title: string; description: string; deadline: string; completed: boolean; status?: string; createdAt: string; }
+export interface Task { id: string; title: string; value: number; dueDate: string; completed: boolean; status?: string; createdAt: string; }
 export interface Message { id: string; type: string; content: string; read: boolean; createdAt: string; }
 
 interface AppContextType {
@@ -30,7 +30,7 @@ interface AppContextType {
   addGoal: (d: string, isDouble: boolean) => Promise<void>;
   addCard: (r: string, t: 'yellow' | 'red') => Promise<void>;
 
-  addTask: (t: Omit<Task, 'id' | 'createdAt'>) => Promise<void>;
+  addTask: (t: { title: string; value: number; dueDate: string }) => Promise<void>;
   completeTask: (id: string, c: boolean) => Promise<void>;
   deleteTask: (id: string) => Promise<void>;
 
@@ -42,6 +42,15 @@ interface AppContextType {
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
+
+// ... (Context Provider and Hooks setup - kept implicit in match if possible, but strict replace needs care)
+// I will replace from Line 15 to Line 42 (interface) AND Line 240+ (implementation).
+// Since replace_file_content works on contiguous blocks, I should probably do two edits if they are far apart.
+// Actually, I can replace the whole file content if I am careful, or use multi_replace.
+// Let's use multi_replace.
+
+
+
 
 export function AppProvider({ children }: { children: React.ReactNode }) {
   const queryClient = useQueryClient();
@@ -198,7 +207,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       if (error) throw error;
       return data.map((t: any) => ({
         id: `task-${t.id}`,
-        title: t.title, description: t.description || '', deadline: t.deadline || new Date().toISOString(),
+        title: t.title,
+        value: Number(t.value),
+        dueDate: t.due_date, // Map from DB
         completed: t.status === 'completed',
         status: t.status,
         createdAt: t.created_at
@@ -317,16 +328,31 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     await addTransaction(t === 'yellow' ? 'yellow_card' : 'red_card', r, -(amount));
   };
 
-  const addTask = async (t: Omit<Task, 'id' | 'createdAt'>) => {
+  const addTask = async (t: { title: string; value: number; dueDate: string }) => {
     try {
-      if (!currentSeasonId || !currentUser || !childId) throw new Error("Contexto inválido");
-      await supabase.from('tasks').insert({
-        title: t.title, description: t.description, deadline: t.deadline,
-        status: 'pending',
-        season_id: currentSeasonId,
-        parent_user_id: currentUser, // Creator
-        child_user_id: childId // Assignee
-      });
+      if (!currentSeasonId) {
+        alert("Sistema carregando... tente em 2 segundos"); // User request
+        return;
+      }
+
+      // Strict Payload Cleaning
+      const payload = {
+        season_id: parseInt(currentSeasonId.toString()),
+        title: t.title,
+        value: parseFloat(t.value.toString()),
+        due_date: t.dueDate,
+        status: 'pending'
+      };
+
+      console.log("Adding Task Payload:", payload);
+
+      const { error } = await supabase.from('tasks').insert(payload);
+
+      if (error) {
+        console.error("Error adding task:", error);
+        throw error;
+      }
+
       queryClient.invalidateQueries({ queryKey: ['tasks'] });
       toast.success("Tarefa criada!");
     } catch (e: any) { toast.error("Erro: " + e.message); }

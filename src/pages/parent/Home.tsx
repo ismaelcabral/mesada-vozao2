@@ -52,12 +52,15 @@ export default function ParentHome() {
   const [goalDesc, setGoalDesc] = useState('');
   const [goalAmount, setGoalAmount] = useState('2');
   const [taskTitle, setTaskTitle] = useState('');
-  const [taskDeadline, setTaskDeadline] = useState('');
+  const [taskValue, setTaskValue] = useState('0');
+  const [taskDate, setTaskDate] = useState('');
   const [msgContent, setMsgContent] = useState('');
   const [baseValueInput, setBaseValueInput] = useState(currentMesadaBase.toString());
 
   // --- CALCS ---
   const totalBalance = transactions.reduce((acc, t) => acc + t.amount, 0);
+  const penalty = transactions.filter(t => t.amount < 0).reduce((acc, t) => acc + Math.abs(t.amount), 0);
+  const bonus = transactions.filter(t => t.type === 'goal').reduce((acc, t) => acc + t.amount, 0);
   const finalMesada = Math.max(0, currentMesadaBase + totalBalance);
 
   const yellowCards = transactions.filter(t => t.type === 'yellow_card');
@@ -114,11 +117,11 @@ export default function ParentHome() {
 
   const taskMutation = useMutation({
     mutationFn: async () => {
-      await addTask({ title: taskTitle, description: '', deadline: taskDeadline || new Date().toISOString(), completed: false });
+      await addTask({ title: taskTitle, value: parseFloat(taskValue), dueDate: taskDate });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['tasks'] });
-      setIsTaskOpen(false); setTaskTitle(''); setTaskDeadline('');
+      setIsTaskOpen(false); setTaskTitle(''); setTaskValue('0'); setTaskDate('');
     }
   });
 
@@ -272,7 +275,7 @@ export default function ParentHome() {
                     <div key={t.id} className="p-4 flex items-center justify-between">
                       <div>
                         <p className={`font-medium text-slate-200 ${t.completed ? 'line-through text-slate-500' : ''}`}>{t.title}</p>
-                        <p className="text-xs text-slate-500">Prazo: {new Date(t.deadline).toLocaleDateString()}</p>
+                        <p className="text-xs text-slate-500">Valor: R${t.value?.toFixed(2)}</p>
                       </div>
                       <div className="flex items-center gap-2">
                         {t.completed && <Badge className="bg-emerald-900/30 text-emerald-400 border-emerald-900">Feita</Badge>}
@@ -458,9 +461,10 @@ export default function ParentHome() {
           <DialogHeader><DialogTitle>Nova Tarefa</DialogTitle></DialogHeader>
           <div className="space-y-4 py-4">
             <div className="space-y-2"><Label className="text-slate-300">Título</Label><Input value={taskTitle} onChange={e => setTaskTitle(e.target.value)} className="bg-slate-950 border-slate-800 text-white" /></div>
-            <div className="space-y-2"><Label className="text-slate-300">Prazo</Label><Input type="date" value={taskDeadline} onChange={e => setTaskDeadline(e.target.value)} className="bg-slate-950 border-slate-800 text-white" /></div>
+            <div className="space-y-2"><Label className="text-slate-300">Valor (R$)</Label><Input type="number" value={taskValue} onChange={e => setTaskValue(e.target.value)} className="bg-slate-950 border-slate-800 text-white" placeholder="0.00" /></div>
+            <div className="space-y-2"><Label className="text-slate-300">Data de Realização</Label><Input type="date" value={taskDate} onChange={e => setTaskDate(e.target.value)} className="bg-slate-950 border-slate-800 text-white" /></div>
           </div>
-          <DialogFooter><Button onClick={() => taskMutation.mutate()} className="bg-blue-600 hover:bg-blue-700">Criar</Button></DialogFooter>
+          <DialogFooter><Button onClick={() => taskMutation.mutate()} className="bg-blue-600 hover:bg-blue-700" disabled={!taskTitle || !taskDate}>Criar</Button></DialogFooter>
         </DialogContent>
       </Dialog>
 
