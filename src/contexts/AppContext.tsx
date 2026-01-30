@@ -369,15 +369,17 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   // --- NEW FEATURES ---
 
   const sendMessage = async (content: string) => {
-    if (!currentSeasonId || !currentUser || !childId) return;
+    if (!currentSeasonId) return;
     try {
-      await supabase.from('motivational_messages').insert({
-        message: content,
-        season_id: currentSeasonId,
-        parent_user_id: currentUser,
-        child_user_id: childId,
-        is_read: false
-      });
+      const payload = {
+        season_id: parseInt(currentSeasonId.toString()),
+        content: content
+      };
+
+      console.log("Sending Message Payload:", payload);
+
+      await supabase.from('motivational_messages').insert(payload as any);
+
       queryClient.invalidateQueries({ queryKey: ['messages'] });
       toast.success("Mensagem enviada!");
     } catch (e: any) { toast.error("Erro ao enviar mensagem"); }
