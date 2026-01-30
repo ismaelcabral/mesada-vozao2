@@ -127,6 +127,8 @@ export default function ParentHome() {
 
   const msgMutation = useMutation({
     mutationFn: async () => {
+      console.log('Texto digitado:', msgContent); // DEBUG
+      if (!msgContent.trim()) return;
       await sendMessage(msgContent);
     },
     onSuccess: () => {
@@ -475,7 +477,7 @@ export default function ParentHome() {
           <div className="space-y-4 py-4">
             <div className="space-y-2"><Label className="text-slate-300">Recado</Label><Textarea value={msgContent} onChange={e => setMsgContent(e.target.value)} className="bg-slate-950 border-slate-800 text-white" /></div>
           </div>
-          <DialogFooter><Button onClick={() => msgMutation.mutate()} className="bg-purple-600 hover:bg-purple-700">Enviar</Button></DialogFooter>
+          <DialogFooter><Button onClick={() => msgMutation.mutate()} className="bg-purple-600 hover:bg-purple-700" disabled={!msgContent.trim()}>Enviar</Button></DialogFooter>
         </DialogContent>
       </Dialog>
 
