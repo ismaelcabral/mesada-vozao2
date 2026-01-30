@@ -230,15 +230,48 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
   // --- REALTIME ---
   useEffect(() => {
-    const channel = supabase.channel('app_changes')
-      .on('postgres_changes', { event: '*', schema: 'public' }, () => {
-        queryClient.invalidateQueries({ queryKey: ['transactions'] });
-        queryClient.invalidateQueries({ queryKey: ['tasks'] });
-        queryClient.invalidateQueries({ queryKey: ['messages'] });
-        queryClient.invalidateQueries({ queryKey: ['season'] });
-      })
+    // Listen for changes in Transactions
+    const transactionsChannel = supabase.channel('realtime-transactions')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'transactions' },
+        () => {
+          console.log('Transação detectada! Atualizando...');
+          queryClient.invalidateQueries({ queryKey: ['transactions'] });
+          queryClient.invalidateQueries({ queryKey: ['season'] }); // Balance might change
+        }
+      )
       .subscribe();
-    return () => { supabase.removeChannel(channel); };
+
+    // Listen for changes in Tasks
+    const tasksChannel = supabase.channel('realtime-tasks')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'tasks' },
+        () => {
+          console.log('Tarefa detectada! Atualizando...');
+          queryClient.invalidateQueries({ queryKey: ['tasks'] });
+        }
+      )
+      .subscribe();
+
+    // Listen for changes in Messages
+    const messagesChannel = supabase.channel('realtime-messages')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'motivational_messages' },
+        () => {
+          console.log('Mensagem detectada! Atualizando...');
+          queryClient.invalidateQueries({ queryKey: ['messages'] });
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(transactionsChannel);
+      supabase.removeChannel(tasksChannel);
+      supabase.removeChannel(messagesChannel);
+    };
   }, [queryClient]);
 
   // --- ACTIONS ---
