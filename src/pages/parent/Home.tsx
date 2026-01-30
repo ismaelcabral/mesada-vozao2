@@ -26,6 +26,7 @@ export default function ParentHome() {
     tasks,
     messages,
     currentMesadaBase,
+    currentSeasonId,
     addTransaction,
     deleteTransaction,
     addTask,
@@ -63,11 +64,16 @@ export default function ParentHome() {
   const redCards = transactions.filter(t => t.type === 'red_card');
   const goals = transactions.filter(t => t.type === 'goal');
 
+  // --- CLASSIFICATION LOGIC ---
   const classification = (() => {
-    if (yellowCards.length <= 4 && redCards.length === 0) return '🏆 Campeão do Vozão';
-    if (yellowCards.length <= 6 && redCards.length <= 1) return '🥈 Série A';
-    if (yellowCards.length <= 9 && redCards.length <= 2) return '🥉 Série B';
-    return '⬇️ Rebaixamento';
+    // 🥇 CAMPEÃO DO VOZÃO: Se (Amarelos <= 4) E (Vermelhos == 0)
+    if (yellowCards.length <= 4 && redCards.length === 0) return { title: '🏆 Campeão do Vozão', color: 'text-yellow-400', bg: 'from-yellow-900/40 to-yellow-600/20' };
+    // 🥈 SÉRIE A: Se (Amarelos <= 6) E (Vermelhos <= 1)
+    if (yellowCards.length <= 6 && redCards.length <= 1) return { title: '🥈 Série A', color: 'text-slate-300', bg: 'from-slate-800 to-slate-700/50' };
+    // 🥉 SÉRIE B: Se (Amarelos entre 7 e 9) E (Vermelhos <= 2)
+    if (yellowCards.length <= 9 && redCards.length <= 2) return { title: '🥉 Série B', color: 'text-orange-400', bg: 'from-orange-900/40 to-orange-600/20' };
+    // 🚨 ZONA DE REBAIXAMENTO
+    return { title: '🚨 Zona de Rebaixamento', color: 'text-red-500', bg: 'from-red-900/40 to-red-600/20' };
   })();
 
   const handleLogout = async () => {
@@ -78,7 +84,12 @@ export default function ParentHome() {
   // --- MUTATIONS ---
   const cardMutation = useMutation({
     mutationFn: async () => {
-      const amount = cardType === 'yellow_card' ? -5 : -10;
+      if (!currentSeasonId) {
+        alert("Erro: Temporada não identificada. Por favor, recarregue a página.");
+        return;
+      }
+      // Red Card now -15
+      const amount = cardType === 'yellow_card' ? -5 : -15;
       await addTransaction(cardType, cardReason, amount);
     },
     onSuccess: () => {
@@ -89,6 +100,10 @@ export default function ParentHome() {
 
   const goalMutation = useMutation({
     mutationFn: async () => {
+      if (!currentSeasonId) {
+        alert("Erro: Temporada não identificada. Por favor, recarregue a página.");
+        return;
+      }
       await addTransaction('goal', goalDesc, parseFloat(goalAmount));
     },
     onSuccess: () => {
@@ -199,12 +214,12 @@ export default function ParentHome() {
             </Card>
           </div>
 
-          <Card className="bg-gradient-to-r from-slate-900 to-slate-800 text-white border-slate-700">
+          <Card className={`bg-gradient-to-r ${classification.bg} text-white border-slate-700`}>
             <CardContent className="pt-6 flex items-center gap-4">
-              <Trophy className="h-10 w-10 text-yellow-400" />
+              <Trophy className={`h-10 w-10 ${classification.color}`} />
               <div>
-                <p className="text-2xl font-bold font-display tracking-widest">{classification}</p>
-                <p className="text-sm text-slate-400">Status Atual</p>
+                <p className="text-2xl font-bold font-display tracking-widest">{classification.title}</p>
+                <p className="text-sm text-slate-200 opacity-90">Status Atual</p>
               </div>
             </CardContent>
           </Card>
@@ -357,22 +372,57 @@ export default function ParentHome() {
 
       {/* CARD */}
       <Dialog open={isCardOpen} onOpenChange={setIsCardOpen}>
-        <DialogContent className="bg-slate-900 border-slate-800 text-white">
+        <DialogContent className="bg-slate-900 border-slate-800 text-white max-w-lg">
           <DialogHeader><DialogTitle>Aplicar Cartão</DialogTitle></DialogHeader>
           <div className="space-y-4 py-4">
             <div className="space-y-2">
-              <Label className="text-slate-300">Tipo</Label>
-              <Select value={cardType} onValueChange={(v: any) => setCardType(v)}>
-                <SelectTrigger className="bg-slate-950 border-slate-800 text-white"><SelectValue /></SelectTrigger>
-                <SelectContent className="bg-slate-900 border-slate-800 text-white">
-                  <SelectItem value="yellow_card">🟨 Amarelo (-5)</SelectItem>
-                  <SelectItem value="red_card">🟥 Vermelho (-10)</SelectItem>
-                </SelectContent>
-              </Select>
+              <Label className="text-slate-300">Tipo de Cartão</Label>
+              <div className="flex gap-4">
+                <div
+                  className={`flex-1 p-4 rounded-xl border cursor-pointer transition-all ${cardType === 'yellow_card' ? 'bg-yellow-900/20 border-yellow-500 shadow-[0_0_15px_-3px_rgba(234,179,8,0.3)]' : 'bg-slate-950 border-slate-800 opacity-60 hover:opacity-100'}`}
+                  onClick={() => setCardType('yellow_card')}
+                >
+                  <div className="w-8 h-10 bg-yellow-500 rounded-sm mb-2 shadow-lg" />
+                  <p className="font-bold text-yellow-500">Amarelo (R$ 5)</p>
+                  <p className="text-xs text-slate-400 mt-1">Infrações leves</p>
+                </div>
+                <div
+                  className={`flex-1 p-4 rounded-xl border cursor-pointer transition-all ${cardType === 'red_card' ? 'bg-red-900/20 border-red-500 shadow-[0_0_15px_-3px_rgba(239,68,68,0.3)]' : 'bg-slate-950 border-slate-800 opacity-60 hover:opacity-100'}`}
+                  onClick={() => setCardType('red_card')}
+                >
+                  <div className="w-8 h-10 bg-red-600 rounded-sm mb-2 shadow-lg" />
+                  <p className="font-bold text-red-500">Vermelho (R$ 15)</p>
+                  <p className="text-xs text-slate-400 mt-1">Infrações graves</p>
+                </div>
+              </div>
             </div>
-            <div className="space-y-2"><Label className="text-slate-300">Motivo</Label><Input value={cardReason} onChange={e => setCardReason(e.target.value)} className="bg-slate-950 border-slate-800 text-white" /></div>
+
+            <div className="space-y-2">
+              <Label className="text-slate-300">Motivos Comuns</Label>
+              <div className="flex flex-wrap gap-2">
+                {cardType === 'yellow_card' ? (
+                  <>
+                    {['Esqueceu descarga', 'Louça na mesa', 'Brinquedos espalhados', 'Responder mal', 'Quebrou combinado'].map(reason => (
+                      <Badge key={reason} variant="secondary" className="bg-slate-800 hover:bg-yellow-900/40 hover:text-yellow-500 cursor-pointer py-1 px-3" onClick={() => setCardReason(reason)}>
+                        {reason}
+                      </Badge>
+                    ))}
+                  </>
+                ) : (
+                  <>
+                    {['Mentir', 'Desrespeito', 'Reincidência'].map(reason => (
+                      <Badge key={reason} variant="secondary" className="bg-slate-800 hover:bg-red-900/40 hover:text-red-500 cursor-pointer py-1 px-3" onClick={() => setCardReason(reason)}>
+                        {reason}
+                      </Badge>
+                    ))}
+                  </>
+                )}
+              </div>
+            </div>
+
+            <div className="space-y-2"><Label className="text-slate-300">Motivo (Personalizado)</Label><Input value={cardReason} onChange={e => setCardReason(e.target.value)} className="bg-slate-950 border-slate-800 text-white" placeholder="Digite ou selecione acima..." /></div>
           </div>
-          <DialogFooter><Button onClick={() => cardMutation.mutate()} variant="destructive">Confirmar</Button></DialogFooter>
+          <DialogFooter><Button onClick={() => cardMutation.mutate()} variant="destructive" disabled={!cardReason}>Confirmar Cartão</Button></DialogFooter>
         </DialogContent>
       </Dialog>
 
@@ -381,10 +431,24 @@ export default function ParentHome() {
         <DialogContent className="bg-slate-900 border-slate-800 text-white">
           <DialogHeader><DialogTitle>Registrar Gol</DialogTitle></DialogHeader>
           <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label className="text-slate-300">Gols Rápidos</Label>
+              <div className="flex flex-wrap gap-2">
+                {['Arrumou quarto', 'Dever sem reclamar', 'Ajudou em casa'].map(r => (
+                  <Badge key={r} variant="secondary" className="bg-slate-800 hover:bg-emerald-900/40 hover:text-emerald-500 cursor-pointer py-1 px-3" onClick={() => { setGoalDesc(r); setGoalAmount('5'); }}>
+                    ⚽ {r} (R$ 5)
+                  </Badge>
+                ))}
+                <Badge variant="secondary" className="bg-slate-800 hover:bg-purple-900/40 hover:text-purple-400 cursor-pointer py-1 px-3 border border-purple-500/30" onClick={() => { setGoalDesc('Elogio da Escola'); setGoalAmount('10'); }}>
+                  🌟 Super Gol: Elogio da Escola (R$ 10)
+                </Badge>
+              </div>
+            </div>
+
             <div className="space-y-2"><Label className="text-slate-300">Descrição</Label><Input value={goalDesc} onChange={e => setGoalDesc(e.target.value)} className="bg-slate-950 border-slate-800 text-white" /></div>
             <div className="space-y-2"><Label className="text-slate-300">Valor</Label><Input type="number" value={goalAmount} onChange={e => setGoalAmount(e.target.value)} className="bg-slate-950 border-slate-800 text-white" /></div>
           </div>
-          <DialogFooter><Button onClick={() => goalMutation.mutate()} className="bg-emerald-600 hover:bg-emerald-700">Confirmar</Button></DialogFooter>
+          <DialogFooter><Button onClick={() => goalMutation.mutate()} className="bg-emerald-600 hover:bg-emerald-700" disabled={!goalDesc}>Confirmar Gol</Button></DialogFooter>
         </DialogContent>
       </Dialog>
 

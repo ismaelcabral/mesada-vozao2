@@ -37,10 +37,10 @@ export default function ChildHome() {
   const finalMesada = Math.max(0, currentMesadaBase + bonus - penalty);
 
   const classification = (() => {
-    if (yellowCards.length <= 4 && redCards.length === 0) return '🏆 Campeão do Vozão';
-    if (yellowCards.length <= 6 && redCards.length <= 1) return '🥈 Série A';
-    if (yellowCards.length <= 9 && redCards.length <= 2) return '🥉 Série B';
-    return '⬇️ Rebaixamento';
+    if (yellowCards.length <= 4 && redCards.length === 0) return { title: '🏆 Campeão do Vozão', color: 'text-yellow-400', bg: 'from-yellow-900/40 to-yellow-600/20' };
+    if (yellowCards.length <= 6 && redCards.length <= 1) return { title: '🥈 Série A', color: 'text-slate-300', bg: 'from-slate-800 to-slate-700/50' };
+    if (yellowCards.length <= 9 && redCards.length <= 2) return { title: '🥉 Série B', color: 'text-orange-400', bg: 'from-orange-900/40 to-orange-600/20' };
+    return { title: '🚨 Zona de Rebaixamento', color: 'text-red-500', bg: 'from-red-900/40 to-red-600/20' };
   })();
 
   const unreadMessages = messages.filter(m => !m.read);
@@ -83,6 +83,7 @@ export default function ChildHome() {
           <TabsTrigger value="dashboard" className="px-3 data-[state=active]:bg-slate-800 data-[state=active]:text-white text-slate-400">Resumo</TabsTrigger>
           <TabsTrigger value="tasks" className="px-3 data-[state=active]:bg-slate-800 data-[state=active]:text-white text-slate-400">{activeTasks.length > 0 && <span className="bg-blue-500 w-2 h-2 rounded-full mr-2"></span>}Tarefas</TabsTrigger>
           <TabsTrigger value="extract" className="px-3 data-[state=active]:bg-slate-800 data-[state=active]:text-white text-slate-400">Extrato</TabsTrigger>
+          <TabsTrigger value="goals" className="px-3 data-[state=active]:bg-slate-800 data-[state=active]:text-white text-slate-400">Meus Gols ⚽</TabsTrigger>
           <TabsTrigger value="messages" className="px-3 data-[state=active]:bg-slate-800 data-[state=active]:text-white text-slate-400">{unreadMessages.length > 0 && <span className="bg-red-500 w-2 h-2 rounded-full mr-2"></span>}Recados</TabsTrigger>
         </TabsList>
 
@@ -98,37 +99,48 @@ export default function ChildHome() {
             </CardContent>
           </Card>
 
-          <Card className="bg-slate-900 border-slate-800 text-white">
+          <Card className={`bg-gradient-to-r ${classification.bg} text-white border-slate-700`}>
             <CardContent className="pt-6 flex items-center justify-between">
               <div>
-                <p className="text-sm text-slate-400">Classificação</p>
-                <p className="text-xl font-bold mt-1 text-white">{classification}</p>
+                <p className="text-sm text-slate-200 opacity-90">Classificação</p>
+                <p className="text-xl font-bold mt-1 text-white">{classification.title}</p>
               </div>
-              <Trophy className="h-10 w-10 text-yellow-500" />
+              <Trophy className={`h-10 w-10 ${classification.color}`} />
             </CardContent>
           </Card>
 
           {/* QUICK ACTIONS GRID */}
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+            {/* Bloco 1: Tarefas */}
             <Button className="h-32 flex flex-col gap-2 bg-slate-900 border border-slate-800 hover:bg-slate-800 hover:border-blue-500 text-white rounded-xl shadow-sm" onClick={() => setActiveTab('tasks')}>
               <CheckCircle2 className="h-10 w-10 text-blue-500" />
-              <span className="font-bold text-lg">Minhas Tarefas</span>
-              <Badge variant="secondary" className="bg-slate-800 text-blue-200">{activeTasks.length} pendentes</Badge>
+              <span className="font-bold text-lg">Tarefas</span>
+              <Badge variant="secondary" className="bg-slate-800 text-blue-200">{activeTasks.length}</Badge>
             </Button>
 
-            <Button className="h-32 flex flex-col gap-2 bg-slate-900 border border-slate-800 hover:bg-slate-800 hover:border-emerald-500 text-white rounded-xl shadow-sm" onClick={() => setActiveTab('extract')}>
-              <div className="flex items-center gap-3 mb-1">
+            {/* Bloco 2: Gols */}
+            <Button className="h-32 flex flex-col gap-2 bg-slate-900 border border-slate-800 hover:bg-slate-800 hover:border-emerald-500 text-white rounded-xl shadow-sm" onClick={() => setActiveTab('goals')}>
+              <div className="flex items-center gap-2 mb-1">
+                <span className="text-3xl font-bold text-emerald-500">{myGoals.length}</span>
+                <Trophy className="h-8 w-8 text-emerald-500" />
+              </div>
+              <span className="font-bold text-lg">Gols</span>
+            </Button>
+
+            {/* Bloco 3: Cartões (NOVO) */}
+            <Button className="h-32 flex flex-col gap-2 bg-slate-900 border border-slate-800 hover:bg-slate-800 hover:border-rose-500 text-white rounded-xl shadow-sm col-span-2 md:col-span-1" onClick={() => setActiveTab('extract')}>
+              <div className="flex items-center gap-6 mb-1">
                 <div className="flex flex-col items-center">
-                  <span className="text-xl font-bold text-yellow-500">{yellowCards.length}</span>
-                  <Trophy className="h-3 w-3 text-yellow-500/50" />
+                  <span className="text-2xl font-bold text-yellow-500">{yellowCards.length}</span>
+                  <AlertTriangle className="h-6 w-6 text-yellow-500/80" />
                 </div>
-                <div className="h-8 w-px bg-slate-800"></div>
+                <div className="h-10 w-px bg-slate-800"></div>
                 <div className="flex flex-col items-center">
-                  <span className="text-xl font-bold text-emerald-500">{myGoals.length}</span>
-                  <Trophy className="h-3 w-3 text-emerald-500/50" />
+                  <span className="text-2xl font-bold text-red-500">{redCards.length}</span>
+                  <AlertTriangle className="h-6 w-6 text-red-600" />
                 </div>
               </div>
-              <span className="font-bold text-lg">Ver Extrato</span>
+              <span className="font-bold text-lg">Cartões</span>
             </Button>
           </div>
         </TabsContent>
@@ -184,6 +196,42 @@ export default function ChildHome() {
           </Card>
         </TabsContent>
 
+        {/* --- GOALS TAB (NEW) --- */}
+        <TabsContent value="goals" className="space-y-4 animate-slide-up">
+          <Card className="bg-gradient-to-br from-emerald-900/50 to-emerald-800/20 border-emerald-500/30">
+            <CardContent className="p-6 flex items-center justify-between">
+              <div>
+                <p className="text-sm text-emerald-300 uppercase tracking-wider font-bold">Total de Gols</p>
+                <p className="text-4xl font-black text-white mt-1">{myGoals.length}</p>
+              </div>
+              <Trophy className="h-12 w-12 text-emerald-400 drop-shadow-[0_0_10px_rgba(52,211,153,0.5)]" />
+            </CardContent>
+          </Card>
+
+          <div className="space-y-3">
+            {myGoals.length === 0 ? <p className="text-center text-slate-500 py-8">Nenhum gol marcado ainda. Vamos lá!</p> : (
+              myGoals.map(goal => (
+                <Card key={goal.id} className="bg-slate-900 border-slate-800 hover:border-emerald-500/50 transition-colors">
+                  <CardContent className="p-4 flex items-center justify-between">
+                    <div className="flex items-center gap-4">
+                      <div className="bg-emerald-500/10 p-3 rounded-full">
+                        <span className="text-xl">⚽</span>
+                      </div>
+                      <div>
+                        <p className="font-bold text-white text-lg">{goal.description}</p>
+                        <p className="text-xs text-slate-500">{new Date(goal.date).toLocaleDateString()}</p>
+                      </div>
+                    </div>
+                    <Badge className="bg-emerald-500/20 text-emerald-400 hover:bg-emerald-500/30 text-base px-3 py-1">
+                      +R$ {goal.amount}
+                    </Badge>
+                  </CardContent>
+                </Card>
+              ))
+            )}
+          </div>
+        </TabsContent>
+
         {/* --- MESSAGES TAB --- */}
         <TabsContent value="messages" className="space-y-4 animate-slide-up">
           <div className="space-y-4">
@@ -201,6 +249,7 @@ export default function ChildHome() {
             {messages.length === 0 && <p className="text-center text-slate-500 py-8">Nenhum recado por enquanto.</p>}
           </div>
         </TabsContent>
+
 
       </Tabs>
     </div>

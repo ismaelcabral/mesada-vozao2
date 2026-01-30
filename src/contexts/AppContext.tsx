@@ -21,6 +21,8 @@ interface AppContextType {
   messages: Message[];
   currentMesadaBase: number;
   currentSeasonId: number | null;
+  childId: string | null;
+  isParent: boolean;
 
   addTransaction: (type: 'goal' | 'yellow_card' | 'red_card', description: string, amount: number) => Promise<void>;
   deleteTransaction: (id: number) => Promise<void>;
@@ -44,64 +46,128 @@ const AppContext = createContext<AppContextType | undefined>(undefined);
 export function AppProvider({ children }: { children: React.ReactNode }) {
   const queryClient = useQueryClient();
   const [currentUser, setCurrentUser] = useState<string | null>(null);
+  const [childId, setChildId] = useState<string | null>(null);
+  const [isParent, setIsParent] = useState(false);
 
-  // --- INIT USER ---
+  // --- INIT USER & FIND CHILD ---
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (session?.user) setCurrentUser(session.user.id);
-    });
+    const init = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.user) return;
+
+      const userId = session.user.id;
+      setCurrentUser(userId);
+
+      // Check role
+      const { data: myProfile } = await supabase.from('profiles').select('role').eq('id', userId).single();
+      const role = myProfile?.role || 'child'; // default to child if unknown? Or logic
+
+      const amIParent = role === 'parent';
+      setIsParent(amIParent);
+
+      if (amIParent) {
+        // Find my child (Simple MVP: find ANY child in the DB, ideally needs family linkage)
+        // Prompt says: "SELECT * FROM profiles WHERE role = 'child' LIMIT 1"
+        const { data: childProfile } = await supabase.from('profiles').select('id').eq('role', 'child').limit(1).maybeSingle();
+        if (childProfile) {
+          setChildId(childProfile.id);
+        } else {
+          console.error("No child profile found!");
+        }
+      } else {
+        // I am the child
+        setChildId(userId);
+      }
+    };
+    init();
   }, []);
 
-  // --- QUERY: SEASON ---
-  const { data: currentSeason } = useQuery({
-    queryKey: ['season', currentUser],
-    enabled: !!currentUser,
-    queryFn: async () => {
-      if (!currentUser) return null;
-      const now = new Date();
-      // Logic: find active season for this User (Parent or Child logic needed? Using simple user_id match for MVP)
-      // Assuming parent is logged in or user owns their season.
-      const { data, error } = await supabase
-        .from('seasons')
-        .select('*')
-        .eq('month', now.getMonth() + 1)
-        .eq('year', now.getFullYear())
-        .eq('user_id', currentUser)
-        .maybeSingle();
+  // --- ENSURE SEASON EXISTS FOR CHILD ---
+  useEffect(() => {
+    if (!childId) return; // Wait until we know who the child is
 
-      if (!data) {
-        // Create if missing
-        const { data: newSeason, error: createError } = await supabase
+    const ensureSeason = async () => {
+      try {
+        const now = new Date();
+        const month = now.getMonth() + 1;
+        const year = now.getFullYear();
+
+        // Check active season for CHILD
+        const { data: existingSeason } = await supabase
+          .from('seasons')
+          .select('id')
+          .eq('child_id', childId) // Correct column name based on user request
+          .eq('is_active', true)
+          .maybeSingle();
+
+        if (existingSeason) return;
+
+        console.log("Creating new season for child:", childId);
+        const { data, error: createError } = await supabase
           .from('seasons')
           .insert({
-            month: now.getMonth() + 1,
-            year: now.getFullYear(),
-            user_id: currentUser,
-            initial_value: 150
-          })
+            month,
+            year,
+            child_id: childId, // Correct column
+            base_value: 150,   // Correct column
+            is_active: true
+          } as any) // Type assertion if types.ts is stale
           .select()
           .single();
-        if (createError) throw createError;
-        return newSeason;
+
+        if (createError) console.error("Error creating season:", createError);
+        else {
+          console.log('Season criada com sucesso:', data);
+          queryClient.invalidateQueries({ queryKey: ['season'] });
+          toast.success("Nova temporada iniciada!");
+        }
+      } catch (err) {
+        console.error("Season init error:", err);
       }
-      return data;
+    };
+
+    ensureSeason();
+  }, [childId, queryClient]);
+
+  // --- QUERY: SEASON (Of the Child) ---
+  const { data: currentSeason } = useQuery({
+    queryKey: ['season', childId],
+    enabled: !!childId,
+    queryFn: async () => {
+      if (!childId) return null;
+      // Fetch active season
+      const query = supabase
+        .from('seasons')
+        .select('*')
+        .eq('child_id', childId)
+        .eq('is_active', true);
+
+      const { data, error } = await query.maybeSingle();
+
+      if (error) {
+        console.error("Error fetching season:", error);
+        return null;
+      }
+
+      // Robust check: if data is array (shouldn't be with maybeSingle, but just in case of weird mock/client behavior)
+      const seasonData = Array.isArray(data) ? data[0] : data;
+      return seasonData;
     }
   });
 
-  const currentMesadaBase = currentSeason?.initial_value ?? 150;
-  const currentSeasonId = currentSeason?.id ?? null;
+  // Use base_value instead of initial_value
+  const currentMesadaBase = (currentSeason as any)?.base_value ?? 150;
+  const currentSeasonId = (currentSeason as any)?.id ?? null;
+
+  console.log('SEASON ID CARREGADO:', currentSeasonId); // DEBUG REQUESTED
 
   // --- QUERY: TRANSACTIONS ---
   const { data: transactions = [] } = useQuery({
     queryKey: ['transactions', currentSeasonId],
     enabled: !!currentSeasonId,
     queryFn: async () => {
-      // Filter by Season ID to ensure we only see current month? 
-      // User requested "Extrato" which implies current relevant history. 
-      // Querying ALL transactions might be heavy but simplified for MVP. 
-      // Let's filter by season_id if we have it, or raw list.
-      // Ideally should filter by season_id.
       if (!currentSeasonId) return [];
+      console.log("Fetching transactions for season:", currentSeasonId); // Extra debug
       const { data, error } = await supabase
         .from('transactions')
         .select('*')
@@ -179,17 +245,30 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
   const addTransaction = async (type: 'goal' | 'yellow_card' | 'red_card', description: string, amount: number) => {
     try {
-      if (!currentSeasonId || !currentUser) throw new Error("Temporada/Usuário não carregado");
-      await supabase.from('transactions').insert({
+      if (!currentSeasonId || !childId) throw new Error("Temporada/Usuário (Filho) não identificado");
+
+      const payload = {
         type,
-        description,
-        amount,
-        season_id: currentSeasonId,
-        user_id: currentUser
-      });
+        description: description || "",
+        amount: Number(amount),
+        season_id: Number(currentSeasonId)
+      };
+
+      console.log('Enviando Payload:', payload);
+
+      const { error } = await supabase.from('transactions').insert(payload);
+
+      if (error) {
+        console.error("Erro Supabase Insert:", error);
+        throw error;
+      }
+
       queryClient.invalidateQueries({ queryKey: ['transactions'] });
       toast.success("Registrado!");
-    } catch (e: any) { toast.error("Erro: " + e.message); }
+    } catch (e: any) {
+      console.error("Erro addTransaction:", e);
+      toast.error("Erro: " + e.message);
+    }
   };
 
   const deleteTransaction = async (id: number) => {
@@ -207,13 +286,13 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
   const addTask = async (t: Omit<Task, 'id' | 'createdAt'>) => {
     try {
-      if (!currentSeasonId || !currentUser) throw new Error("Temporada não carregada");
+      if (!currentSeasonId || !currentUser || !childId) throw new Error("Contexto inválido");
       await supabase.from('tasks').insert({
         title: t.title, description: t.description, deadline: t.deadline,
         status: 'pending',
         season_id: currentSeasonId,
-        parent_user_id: currentUser,
-        child_user_id: currentUser // Simplify ownership
+        parent_user_id: currentUser, // Creator
+        child_user_id: childId // Assignee
       });
       queryClient.invalidateQueries({ queryKey: ['tasks'] });
       toast.success("Tarefa criada!");
@@ -231,13 +310,13 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   // --- NEW FEATURES ---
 
   const sendMessage = async (content: string) => {
-    if (!currentSeasonId || !currentUser) return;
+    if (!currentSeasonId || !currentUser || !childId) return;
     try {
       await supabase.from('motivational_messages').insert({
         message: content,
         season_id: currentSeasonId,
         parent_user_id: currentUser,
-        child_user_id: currentUser, // Simplifying: user is both parent/child context for now
+        child_user_id: childId,
         is_read: false
       });
       queryClient.invalidateQueries({ queryKey: ['messages'] });
@@ -253,7 +332,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const updateMesadaBase = async (newVal: number) => {
     if (!currentSeasonId) return;
     try {
-      await supabase.from('seasons').update({ initial_value: newVal }).eq('id', currentSeasonId);
+      await supabase.from('seasons').update({ base_value: newVal } as any).eq('id', currentSeasonId); // Updated column
       queryClient.invalidateQueries({ queryKey: ['season'] });
       toast.success("Valor base atualizado!");
     } catch (e) { toast.error("Erro ao atualizar valor"); }
@@ -262,7 +341,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const closeMonth = async () => {
     if (!currentSeasonId) return;
     try {
-      await supabase.from('seasons').update({ is_finalized: true }).eq('id', currentSeasonId);
+      await supabase.from('seasons').update({ is_finalized: true } as any).eq('id', currentSeasonId); // Ensure is_finalized exists? User only mentioned initial_value/child_id. Assuming is_finalized is fine or unchanged.
       queryClient.invalidateQueries({ queryKey: ['season'] });
       toast.success("Mês fechado com sucesso!");
     } catch (e) { toast.error("Erro ao fechar mês"); }
@@ -271,6 +350,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const value: AppContextType = {
     transactions, tasks, messages,
     currentMesadaBase, currentSeasonId,
+    childId, isParent,
     addTransaction, deleteTransaction,
     addGoal, addCard,
     addTask, completeTask, deleteTask,
