@@ -73,8 +73,9 @@ export default function ChildHome() {
       <div className="flex items-center justify-between mb-4 bg-slate-900 p-3 rounded-xl border border-slate-800 shadow-sm">
         <div>
           {/* Logic for Title */}
+          {/* Logic for Title */}
           {(() => {
-            const titleText = (userProfile?.name) ? `Painel do ${userProfile.name}` : "Painel do Filho";
+            const titleText = userProfile?.name ? `PAINEL DO ${userProfile.name.toUpperCase()}` : "PAINEL DO FILHO";
             return <h1 className="text-xl font-bold font-display text-white">{titleText}</h1>;
           })()}
           <p className="text-xs text-slate-400">Mesada do Vozão</p>

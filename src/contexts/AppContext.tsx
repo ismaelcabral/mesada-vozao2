@@ -62,37 +62,39 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [childId, setChildId] = useState<string | null>(null);
   const [isParent, setIsParent] = useState(false);
 
-  // --- INIT USER & FIND CHILD ---
   useEffect(() => {
     const init = async () => {
       const { data: { session } } = await supabase.auth.getSession();
+
+      // 1. Verificar se há usuário logado
       if (!session?.user) return;
 
       const userId = session.user.id;
       setCurrentUser(userId);
-      setUserEmail(session.user.email || null); // Capture email
+      setUserEmail(session.user.email || null);
 
-      // Check role & name
+      // Check role & name for the logged user
       const { data: myProfile } = await supabase.from('profiles').select('name, role').eq('id', userId).single();
       if (myProfile) setUserProfile(myProfile);
 
-      const role = myProfile?.role || 'child'; // default to child if unknown? Or logic
+      const role = myProfile?.role || 'child';
+      setIsParent(role === 'parent');
 
-      const amIParent = role === 'parent';
-      setIsParent(amIParent);
+      // 2. Buscar qualquer perfil de filho (Assumindo app familiar único)
+      // "Não use o ID do usuário logado para filtrar o filho."
+      const { data: childProfile } = await supabase
+        .from('profiles')
+        .select('id, name')
+        .eq('role', 'child')
+        .limit(1)
+        .maybeSingle();
 
-      if (amIParent) {
-        // Find my child (Simple MVP: find ANY child in the DB, ideally needs family linkage)
-        // Prompt says: "SELECT * FROM profiles WHERE role = 'child' LIMIT 1"
-        const { data: childProfile } = await supabase.from('profiles').select('id').eq('role', 'child').limit(1).maybeSingle();
-        if (childProfile) {
-          setChildId(childProfile.id);
-        } else {
-          console.error("No child profile found!");
-        }
+      // 3. Com o child.id, o resto do fluxo (busca de temporada) ocorre via childId state + useQuery
+      if (childProfile) {
+        console.log("Child identified:", childProfile.id);
+        setChildId(childProfile.id);
       } else {
-        // I am the child
-        setChildId(userId);
+        console.error("ERRO CRÍTICO: Nenhum perfil de filho encontrado.");
       }
     };
     init();

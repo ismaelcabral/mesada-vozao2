@@ -173,11 +173,12 @@ export default function ParentHome() {
       <div className="flex items-center justify-between bg-slate-900 p-4 rounded-xl shadow-sm border border-slate-800">
         <div>
           {/* Logic for Title */}
+          {/* Logic for Title */}
           {(() => {
             const isMother = userEmail?.toLowerCase().includes('mae') ||
               userEmail?.toLowerCase().includes('mãe') ||
-              userProfile?.name?.toLowerCase().includes('mãe');
-            const titleText = isMother ? "Painel da Mãe" : "Painel do Pai";
+              userEmail?.toLowerCase().includes('mamae');
+            const titleText = isMother ? "PAINEL DA MÃE" : "PAINEL DO PAI";
             return <h1 className="text-2xl font-bold font-display tracking-wide text-white">{titleText}</h1>;
           })()}
           <p className="text-xs text-slate-400">Mesada do Vozão</p>
