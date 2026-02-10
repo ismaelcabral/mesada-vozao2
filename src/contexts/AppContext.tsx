@@ -39,6 +39,8 @@ interface AppContextType {
 
   updateMesadaBase: (newVal: number) => Promise<void>;
   closeMonth: () => Promise<void>;
+  userProfile: { name: string | null } | null; // Added
+  userEmail: string | null; // Added
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -55,6 +57,8 @@ const AppContext = createContext<AppContextType | undefined>(undefined);
 export function AppProvider({ children }: { children: React.ReactNode }) {
   const queryClient = useQueryClient();
   const [currentUser, setCurrentUser] = useState<string | null>(null);
+  const [userEmail, setUserEmail] = useState<string | null>(null); // Added
+  const [userProfile, setUserProfile] = useState<{ name: string | null; role?: string } | null>(null); // Added
   const [childId, setChildId] = useState<string | null>(null);
   const [isParent, setIsParent] = useState(false);
 
@@ -66,9 +70,12 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
       const userId = session.user.id;
       setCurrentUser(userId);
+      setUserEmail(session.user.email || null); // Capture email
 
-      // Check role
-      const { data: myProfile } = await supabase.from('profiles').select('role').eq('id', userId).single();
+      // Check role & name
+      const { data: myProfile } = await supabase.from('profiles').select('name, role').eq('id', userId).single();
+      if (myProfile) setUserProfile(myProfile);
+
       const role = myProfile?.role || 'child'; // default to child if unknown? Or logic
 
       const amIParent = role === 'parent';
@@ -416,7 +423,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     addGoal, addCard,
     addTask, completeTask, deleteTask,
     sendMessage, markMessageAsRead,
-    updateMesadaBase, closeMonth
+    updateMesadaBase, closeMonth,
+    userProfile, userEmail // Exposed
   };
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;

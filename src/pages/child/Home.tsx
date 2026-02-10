@@ -22,7 +22,8 @@ export default function ChildHome() {
     messages,
     currentMesadaBase,
     completeTask,
-    markMessageAsRead
+    markMessageAsRead,
+    userProfile
   } = useApp();
 
   const [activeTab, setActiveTab] = useState("dashboard");
@@ -71,7 +72,11 @@ export default function ChildHome() {
     <div className="min-h-screen bg-slate-950 text-slate-50 p-4 pb-24 font-body">
       <div className="flex items-center justify-between mb-4 bg-slate-900 p-3 rounded-xl border border-slate-800 shadow-sm">
         <div>
-          <h1 className="text-xl font-bold font-display text-white">Meu Painel</h1>
+          {/* Logic for Title */}
+          {(() => {
+            const titleText = (userProfile?.name) ? `Painel do ${userProfile.name}` : "Painel do Filho";
+            return <h1 className="text-xl font-bold font-display text-white">{titleText}</h1>;
+          })()}
           <p className="text-xs text-slate-400">Mesada do Vozão</p>
         </div>
         <Button onClick={handleLogout} variant="ghost" size="sm" className="text-slate-400 hover:text-white hover:bg-slate-800">Sair</Button>

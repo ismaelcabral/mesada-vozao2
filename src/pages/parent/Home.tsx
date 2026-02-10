@@ -33,7 +33,9 @@ export default function ParentHome() {
     deleteTask,
     sendMessage,
     updateMesadaBase,
-    closeMonth
+    closeMonth,
+    userProfile,
+    userEmail
   } = useApp();
 
   // --- STATE ---
@@ -170,7 +172,14 @@ export default function ParentHome() {
       {/* Header */}
       <div className="flex items-center justify-between bg-slate-900 p-4 rounded-xl shadow-sm border border-slate-800">
         <div>
-          <h1 className="text-2xl font-bold font-display tracking-wide text-white">Painel do Pai</h1>
+          {/* Logic for Title */}
+          {(() => {
+            const isMother = userEmail?.toLowerCase().includes('mae') ||
+              userEmail?.toLowerCase().includes('mãe') ||
+              userProfile?.name?.toLowerCase().includes('mãe');
+            const titleText = isMother ? "Painel da Mãe" : "Painel do Pai";
+            return <h1 className="text-2xl font-bold font-display tracking-wide text-white">{titleText}</h1>;
+          })()}
           <p className="text-xs text-slate-400">Mesada do Vozão</p>
         </div>
         <Button onClick={handleLogout} variant="ghost" size="sm" className="text-slate-400 hover:text-white hover:bg-slate-800">Sair</Button>
