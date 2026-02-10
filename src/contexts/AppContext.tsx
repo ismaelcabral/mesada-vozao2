@@ -64,10 +64,22 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     const init = async () => {
+      // 1. Setup Auth Listener (Token Refresh Error Handling)
+      const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+        if (event === 'SIGNED_OUT' || event === 'USER_DELETED') {
+          setCurrentUser(null);
+          setChildId(null);
+          // Optional: clear local storage if needed
+        }
+      });
+
       const { data: { session } } = await supabase.auth.getSession();
 
-      // 1. Verificar se há usuário logado
-      if (!session?.user) return;
+      if (!session?.user) {
+        // Force clear if no session
+        setCurrentUser(null);
+        return;
+      }
 
       const userId = session.user.id;
       setCurrentUser(userId);
@@ -80,8 +92,11 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       const role = myProfile?.role || 'child';
       setIsParent(role === 'parent');
 
-      // 2. Buscar qualquer perfil de filho (Assumindo app familiar único)
-      // "Não use o ID do usuário logado para filtrar o filho."
+      // ---------------------------------------------------------
+      // AGNOSTIC CHILD DISCOVERY (Family View)
+      // ---------------------------------------------------------
+      // Buscamos "O Filho" da aplicação, independente de quem está logado (Pai ou Mãe).
+      // Isso permite que a Mãe (que não criou o registro) veja os dados do Filho.
       const { data: childProfile } = await supabase
         .from('profiles')
         .select('id, name')
@@ -89,20 +104,24 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         .limit(1)
         .maybeSingle();
 
-      // 3. Com o child.id, o resto do fluxo (busca de temporada) ocorre via childId state + useQuery
       if (childProfile) {
-        console.log("Child identified:", childProfile.id);
+        console.log("Family Context - Child identified:", childProfile.id);
         setChildId(childProfile.id);
       } else {
-        console.error("ERRO CRÍTICO: Nenhum perfil de filho encontrado.");
+        console.error("ERRO CRÍTICO: Nenhum perfil de filho encontrado na base.");
       }
+
+      return () => {
+        subscription.unsubscribe();
+      };
     };
     init();
   }, []);
 
   // --- ENSURE SEASON EXISTS FOR CHILD ---
+  // This logic runs once we identified the "Family Child"
   useEffect(() => {
-    if (!childId) return; // Wait until we know who the child is
+    if (!childId) return;
 
     const ensureSeason = async () => {
       try {
@@ -114,11 +133,14 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         const { data: existingSeason } = await supabase
           .from('seasons')
           .select('id')
-          .eq('child_id', childId) // Correct column name based on user request
+          .eq('child_id', childId)
           .eq('is_active', true)
           .maybeSingle();
 
-        if (existingSeason) return;
+        if (existingSeason) {
+          console.log("Season Ativa Encontrada:", existingSeason.id);
+          return;
+        }
 
         console.log("Creating new season for child:", childId);
         const { data, error: createError } = await supabase
@@ -126,10 +148,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           .insert({
             month,
             year,
-            child_id: childId, // Correct column
-            base_value: 150,   // Correct column
+            child_id: childId,
+            base_value: 150,
             is_active: true
-          } as any) // Type assertion if types.ts is stale
+          } as any)
           .select()
           .single();
 
